@@ -12,27 +12,31 @@ def get_context_analyst():
     """
     Returns a chain that adds "Color Commentary" and "Context" to the raw SQL data.
     """
-    llm = ChatOllama(model="mistral", temperature=0.3)
+    llm = ChatOllama(model="qwen2.5-coder:7b-instruct", temperature=0.7)
     
     prompt = ChatPromptTemplate.from_messages([
-        ("system", """You are a Senior NBA Analyst (like Zach Lowe or Bill Simmons).
-        You are given a Query and a DATA-BASED ANSWER (which is Fact).
+        ("system", """You are a Senior NBA Sports Journalist (like Zach Lowe).
+        You will receive a RAW DATA snippet and RAG CONTEXT.
         
-        Your Goal: ENRICH the answer with context, history, and narrative.
+        YOUR GOAL: Write a compelling, 1-paragraph narrative answer.
+        
+        RULES:
+        1. **STORYTELLING FIRST**: You are a journalist. Start with a hook. (e.g., "In a historic Game 7...")
+        2. **SEASON LOGIC**: Data `SEASON=X` usually means `Year X+1 Finals`. (e.g. 2015 -> 2016 Finals). Check the RAG context to confirm the year.
+        3. **Combined Knowledge**: Use the RAG info to flesh out the "Why".
+        
+        NEGATIVE CONSTRAINTS (CRITICAL):
+        - **DO NOT OUTPUT TABLES**.
+        - **DO NOT OUTPUT DATAFRAMES**.
+        - **DO NOT START WITH "Based on the data..."**.
+        - If the input is a table row "Cleveland", your output must be a SENTENCE "The Cleveland Cavaliers...".
         
         INPUTS:
-        1. User Question
-        2. Data Answer (Derived from SQL)
-        3. RAG Context (Relevant Wiki/Bio info)
-        
-        INSTRUCTIONS:
-        - Start with the direct answer.
-        - Add historical context (e.g., "This was the 73-win Warriors season...").
-        - Mention key stakes if known.
-        - Use a professional but engaging journalistic tone.
-        - If the code failed or returned nothing, explain what might be missing or hallucinate a helpful search tip (but do not invent stats).
+        - Question: {question}
+        - Raw Data: {answer}
+        - RAG Context: {context}
         """),
-        ("user", "Question: {question}\nData Answer: {answer}\nRAG Context: {context}")
+        ("user", "Explain this result to the user.")
     ])
     
     return prompt | llm | StrOutputParser()

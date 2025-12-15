@@ -30,6 +30,7 @@ class QueryResponse(BaseModel):
     plan: str
     code: str
     result: str
+    narrative: str | None = None
     success: bool
 
 # Initialize Chains (Lazy load to allow time for pip install)
@@ -139,11 +140,21 @@ async def run_query(req: QueryRequest):
         narrative = ""
         if success:
             rag_context = retrieve_rag_context(req.question)
-            narrative = analyst.invoke({
-                "question": req.question,
-                "answer": result_output,
-                "context": rag_context
-            })
+            print(f"   [RAG] Content Length: {len(rag_context)}")
+            
+            try:
+                narrative = analyst.invoke({
+                    "question": req.question,
+                    "answer": result_output,
+                    "context": rag_context
+                })
+                print(f"   [Analyst] Output Length: {len(narrative)}")
+                
+                if not narrative.strip():
+                     narrative = "The Analyst Agent returned no narrative. Check terminal logs."
+            except Exception as e:
+                print(f"   [Analyst] Error: {e}")
+                narrative = f"Analyst Error: {e}"
             
         return QueryResponse(
             plan=plan,
