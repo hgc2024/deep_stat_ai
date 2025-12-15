@@ -29,6 +29,7 @@ def get_context_analyst():
         - **DO NOT OUTPUT TABLES**.
         - **DO NOT OUTPUT DATAFRAMES**.
         - **DO NOT START WITH "Based on the data..."**.
+        - **NO HALLUCINATIONS**: Do not invent games (e.g. 2023) if not in data.
         - If the input is a table row "Cleveland", your output must be a SENTENCE "The Cleveland Cavaliers...".
         
         INPUTS:

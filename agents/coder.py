@@ -26,8 +26,9 @@ def get_coder_chain():
         2. **Load Final Result**: Only convert to `.df()` when you have the computed answer.
         3. **Print**: Use `print(df)` to show the result.
         4. **Cast Numpy Types**: DuckDB fails on `numpy.int64`. ALWAYS cast to `int()` or `float()` before using in SQL.
+        5. **Use Aliases**: ALWAYS use table aliases (e.g. `game_stats gs`). Select `gs.PTS`, not `PTS`.
         
-        Example Pattern:
+        Example Pattern 1 (Championship):
         ```python
         import duckdb
         con = duckdb.connect('nba.duckdb')
@@ -43,6 +44,23 @@ def get_coder_chain():
               AND cast(g.GAME_ID as VARCHAR) LIKE '4%' -- Playoffs
             ORDER BY g.GAME_ID DESC -- The game with Max ID is the Finals clincher
             LIMIT 1
+        \"\"\"
+        df = con.execute(query).df()
+        print(df)
+        ```
+        
+        Example Pattern 2 (Comparison):
+        ```python
+        # Q: Compare LeBron and Curry
+        query = \"\"\"
+            SELECT gs.PLAYER_NAME, 
+                   COUNT(DISTINCT gs.GAME_ID) as GP,
+                   SUM(gs.PTS) as Total_Points,
+                   AVG(gs.PTS) as PPG
+            FROM game_stats gs
+            WHERE gs.PLAYER_NAME IN ('LeBron James', 'Stephen Curry')
+            GROUP BY gs.PLAYER_NAME
+            ORDER BY Total_Points DESC
         \"\"\"
         df = con.execute(query).df()
         print(df)

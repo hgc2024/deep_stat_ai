@@ -27,6 +27,7 @@ def get_architect_chain():
         2. Specify the Filters (Season=2016, Player='Curry').
         3. Specify the Merge Logic (e.g., "Merge games and stats on GAME_ID").
         4. Specify the Aggregation logic (e.g., "Sum PTS grouped by Player").
+        5. **COMPARISONS**: Do NOT use `LIMIT 1`. Select ALL requested players. Calculate derived stats (PPG, Wins).
         
         Example Input: "Who won the 2016 Championship?"
         Example Output: 
@@ -34,6 +35,14 @@ def get_architect_chain():
         2. Order by GAME_ID DESC and LIMIT 1 to find the last game (The Finals).
         3. Identify the winner using 'HOME_TEAM_WINS'.
         4. Join with 'teams' table to get the Team Name.
+        
+        Example Input: "Compare Lebron and Curry"
+        Example Output:
+        1. Load 'game_stats' joined with 'games'.
+        2. Filter PLAYER_NAME LIKE '%LeBron%' OR PLAYER_NAME LIKE '%Curry%'.
+        3. Group By PLAYER_NAME.
+        4. Calculate Stats: COUNT(GAME_ID) as GP, SUM(PTS) as Total_Points, AVG(PTS) as PPG, SUM(REB) as Total_Reb.
+        5. Order by Total_Points DESC. (NO LIMIT).
         """),
         ("user", "{question}")
     ])
