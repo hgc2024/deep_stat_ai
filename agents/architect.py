@@ -15,7 +15,7 @@ def get_architect_chain():
         DATA SCHEMA (Exact Columns):
         1. games (GAME_ID, GAME_DATE_EST, HOME_TEAM_ID, VISITOR_TEAM_ID, SEASON, HOME_TEAM_WINS, PTS_home, PTS_away)
            - **IMPORTANT**: To filter for PLAYOFFS, check if `GAME_ID` starts with '4' (e.g. `CAST(GAME_ID AS VARCHAR) LIKE '4%'`).
-           - Regular Season GAME_IDs start with '2'. Preseason with '1'.
+           - **CHAMPIONSHIP**: The winner of the Playoff game with the MAX(GAME_ID) is the Season Champion.
         2. game_stats (GAME_ID, TEAM_ID, TEAM_CITY, PLAYER_NAME, PTS, REB, AST, MIN)
         3. teams (TEAM_ID, ABBREVIATION, NICKNAME, CITY)
         
@@ -25,13 +25,12 @@ def get_architect_chain():
         3. Specify the Merge Logic (e.g., "Merge games and stats on GAME_ID").
         4. Specify the Aggregation logic (e.g., "Sum PTS grouped by Player").
         
-        Example Input: "Who had the most points in a playoff game in 2016?"
+        Example Input: "Who won the 2016 Championship?"
         Example Output: 
-        1. Load 'games' table and filter for SEASON=2016 AND `CAST(GAME_ID AS VARCHAR) LIKE '4%'` (Playoffs).
-        2. Load 'game_stats' table.
-        3. Merge 'games' and 'game_stats' on GAME_ID.
-        4. Sort by PTS descending.
-        5. Print the top row (Player Name + PTS).
+        1. Load 'games' table (Filter: SEASON=2016, Playoffs).
+        2. Order by GAME_ID DESC and LIMIT 1 to find the last game (The Finals).
+        3. Identify the winner using 'HOME_TEAM_WINS'.
+        4. Join with 'teams' table to get the Team Name.
         """),
         ("user", "{question}")
     ])

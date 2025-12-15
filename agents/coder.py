@@ -3,8 +3,10 @@ from langchain_ollama import ChatOllama
 from langchain_core.output_parsers import StrOutputParser
 
 def get_coder_chain():
+    # Initialize the LLM with the SOTA coding model
     llm = ChatOllama(model="qwen2.5-coder:7b-instruct", temperature=0)
     
+    # Define the Prompt Template
     prompt = ChatPromptTemplate.from_messages([
         ("system", """You are a Python Data Scientist specialized in Pandas and DuckDB.
         Your goal is to write a script to answer the question below.
@@ -30,15 +32,16 @@ def get_coder_chain():
         import duckdb
         con = duckdb.connect('nba.duckdb')
         
-        # SQL does the heavy lifting
+        # Q: Who won the 2016 Championship? (Logic: Winner of last playoff game)
         query = \"\"\"
-            SELECT gs.PLAYER_NAME, SUM(gs.PTS) as TOTAL_PTS
-            FROM game_stats gs
-            JOIN games g ON gs.GAME_ID = g.GAME_ID
+            SELECT t.NICKNAME, t.CITY
+            FROM games g
+            JOIN teams t ON (
+                CASE WHEN g.HOME_TEAM_WINS = 1 THEN g.HOME_TEAM_ID ELSE g.VISITOR_TEAM_ID END = t.TEAM_ID
+            )
             WHERE g.SEASON = 2016 
               AND cast(g.GAME_ID as VARCHAR) LIKE '4%' -- Playoffs
-            GROUP BY gs.PLAYER_NAME
-            ORDER BY TOTAL_PTS DESC
+            ORDER BY g.GAME_ID DESC -- The game with Max ID is the Finals clincher
             LIMIT 1
         \"\"\"
         df = con.execute(query).df()
