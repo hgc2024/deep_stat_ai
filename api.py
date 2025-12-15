@@ -1,121 +1,171 @@
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from fastapi.middleware.cors import CORSMiddleware
-from utils.data_loader import get_game_stats
-from graph import app as graph_app
-import time
-import uvicorn
+import duckdb
+import io
+import contextlib
+import os
 
-app = FastAPI(title="SportsEdit-AI API")
+# Import Agents
+# Import Agents
+from agents.architect import get_architect_chain
+from agents.coder import get_coder_chain
+from agents.analyst import get_context_analyst, retrieve_rag_context
 
-# Allow CORS for React Client (localhost:5173)
+app = FastAPI()
+
+# Allow CORS for React (Vite usually runs on 5173)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"], # For local dev, allow all
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-class GameRequest(BaseModel):
-    game_id: str
+class QueryRequest(BaseModel):
+    question: str
+
+class QueryResponse(BaseModel):
+    plan: str
+    code: str
+    result: str
+    success: bool
+
+# Initialize Chains (Lazy load to allow time for pip install)
+architect_chain = None
+coder_chain = None
+analyst_chain = None
+
+def get_chains():
+    global architect_chain, coder_chain, analyst_chain
+    if not architect_chain:
+        architect_chain = get_architect_chain()
+    if not coder_chain:
+        coder_chain = get_coder_chain()
+    if not analyst_chain:
+        analyst_chain = get_context_analyst()
+    return architect_chain, coder_chain, analyst_chain
+
+import pandas as pd 
+
+def execute_code(code):
+    print("\n🐍 EXECUTING CODE...")
+    code = code.replace("```python", "").replace("```", "").strip()
+    
+    f = io.StringIO()
+    f_err = io.StringIO()
+    success = False
+    exec_globals = {'duckdb': duckdb, 'pd': pd}
+    
+    with contextlib.redirect_stdout(f), contextlib.redirect_stderr(f_err):
+        try:
+            exec(code, exec_globals)
+            success = True
+        except Exception as e:
+            print(f"RUNTIME ERROR: {e}")
+            import traceback
+            traceback.print_exc()
+            success = False
+            
+    output = f.getvalue()
+    errors = f_err.getvalue()
+    
+    if errors: output += f"\n[STDERR]\n{errors}"
+
+    if not output.strip() and success:
+        if 'result' in exec_globals: output = f"[Captured 'result']:\n{exec_globals['result']}"
+        elif 'df' in exec_globals: output = f"[Captured 'df']:\n{exec_globals['df']}"
+        else: output = "(No output. Try assigning 'result' variable.)"
+            
+    return output, success
+
+import re
+
+@app.post("/api/query", response_model=QueryResponse)
+async def run_query(req: QueryRequest):
+    try:
+        architect, coder, analyst = get_chains()
+        
+        # 1. Plan
+        print(f"🤔 Planning: {req.question}")
+        plan = architect.invoke({"question": req.question})
+        
+        # 2. Code
+        print(f"💻 Coding...")
+        code_raw = coder.invoke({"plan": plan, "question": req.question})
+        
+        # Robust Extraction: Find content strictly inside ```python ... ```
+        match = re.search(r"```python(.*?)```", code_raw, re.DOTALL)
+        if match:
+            code_clean = match.group(1).strip()
+        else:
+            # Fallback: Just strip fences if regex fails
+            code_clean = code_raw.replace("```python", "").replace("```", "").strip()
+        
+        # 3. Execute with Retry
+        max_retries = 2
+        attempt = 0
+        success = False
+        result_output = ""
+        
+        while attempt <= max_retries:
+            print(f"🐍 Executing (Attempt {attempt+1}/{max_retries+1})...")
+            result_output, success = execute_code(code_clean)
+            
+            if success:
+                break
+            
+            attempt += 1
+            if attempt <= max_retries:
+                print(f"⚠️ Runtime Error. Requesting Fix from Coder...")
+                error_hint = f"\n\nPREVIOUS CODE FAILED WITH ERROR:\n{result_output}\n\nFIX THE CODE. DO NOT REPEAT MISTAKES."
+                
+                # Ask Coder to Fix
+                code_raw = coder.invoke({
+                    "plan": plan, 
+                    "question": req.question + error_hint
+                })
+                
+                # Extract
+                match = re.search(r"```python(.*?)```", code_raw, re.DOTALL)
+                if match:
+                    code_clean = match.group(1).strip()
+                else:
+                    code_clean = code_raw.replace("```python", "").replace("```", "").strip()
+        
+        # 4. Analyst Augmentation
+        print(f"🎙️ Analyzing...")
+        narrative = ""
+        if success:
+            rag_context = retrieve_rag_context(req.question)
+            narrative = analyst.invoke({
+                "question": req.question,
+                "answer": result_output,
+                "context": rag_context
+            })
+            
+        return QueryResponse(
+            plan=plan,
+            code=code_clean,
+            result=result_output,
+            narrative=narrative,
+            success=success
+        )
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/health")
-def health_check():
-    return {"status": "ok"}
-
-@app.post("/draft")
-async def draft_article(request: GameRequest):
-    game_id = request.game_id
-    start_time = time.time()
-    
-    # 1. Fetch Stats
-    stats_data = get_game_stats(game_id)
-    if "Error" in stats_data:
-        raise HTTPException(status_code=404, detail=stats_data)
-        
-    # 2. Run Agents
-    inputs = {
-        "input_stats": stats_data, 
-        "draft": "", 
-        "critique_status": "", 
-        "critique_errors": [], 
-        "revision_count": 0
-    }
-    
-    try:
-        final_state = graph_app.invoke(inputs)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-        
-    execution_time = time.time() - start_time
-    
-    # Return structured data for Frontend
-    # Use feedback from jury if any
-    return {
-        "game_id": game_id,
-        "draft": final_state.get('draft'),
-        "status": final_state.get('jury_verdict'),
-        "errors": final_state.get('jury_feedback', []),
-        "revisions": final_state.get('revision_count', 0),
-        "execution_time": execution_time,
-        "stats_context": stats_data
-    }
-
-class EvalRequest(BaseModel):
-    batch_size: int = 5
-    iterations: int = 1
-    game_type: str = 'all'
-
-@app.post("/evaluate")
-async def run_evaluation(request: EvalRequest):
-    from utils.data_loader import get_random_game_ids
-    import asyncio
-    
-    game_ids = get_random_game_ids(request.batch_size, request.game_type)
-    results = []
-    
-    total_start = time.time()
-    
-    # Run sequentially to not OOM the GPU
-    for gid in game_ids:
-        for i in range(request.iterations):
-            try:
-                # Reuse draft logic but return internal stats
-                stats_data = get_game_stats(gid)
-                if "Error" in stats_data:
-                    continue
-                    
-                start_t = time.time()
-                inputs = {
-                    "input_stats": stats_data, 
-                    "draft": "", 
-                    "jury_verdict": "", 
-                    "jury_feedback": [], 
-                    "revision_count": 0
-                }
-                final_state = await asyncio.to_thread(graph_app.invoke, inputs)
-                duration = time.time() - start_t
-                
-                results.append({
-                    "game_id": gid,
-                    "iteration": i+1,
-                    "status": final_state.get("jury_verdict", "FAIL"),
-                    "revisions": final_state.get("revision_count", 0),
-                    "duration": duration,
-                    "cost_est": 0.05 # Placeholder $0.05
-                })
-            except Exception as e:
-                print(f"Eval Error {gid}: {e}")
-                
-    total_duration = time.time() - total_start
-    
-    return {
-        "total_duration": total_duration,
-        "total_runs": len(results),
-        "results": results,
-        "games_processed": game_ids
-    }
+def health():
+    return {"status": "ok", "db": os.path.exists("nba.duckdb")}
 
 if __name__ == "__main__":
+    import uvicorn
+    # Init DB if needed
+    if not os.path.exists("nba.duckdb"):
+        print("⚠️ Warning: nba.duckdb not found. Run utils/init_db.py first!")
+        
     uvicorn.run(app, host="0.0.0.0", port=8000)

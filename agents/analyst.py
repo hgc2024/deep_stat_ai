@@ -1,42 +1,61 @@
 from langchain_ollama import ChatOllama
 from langchain_core.prompts import ChatPromptTemplate
-from langchain_core.output_parsers import JsonOutputParser
-from pydantic import BaseModel, Field
-from typing import List
+from langchain_core.output_parsers import StrOutputParser
+import chromadb
+import os
 
-# Define the output structure
-class NarrativeBeats(BaseModel):
-    beats: List[str] = Field(description="List of 3-5 key narrative beats or facts from the game.")
+# Initialize Vector DB Client
+CHROMA_PATH = "nba_chroma"
+client = chromadb.PersistentClient(path=CHROMA_PATH)
 
 def get_context_analyst():
     """
-    Returns a chain that identifies the 'Gold Standard' narrative beats from game stats.
+    Returns a chain that adds "Color Commentary" and "Context" to the raw SQL data.
     """
-    llm = ChatOllama(model="llama3.2", temperature=0.1)
-    
-    parser = JsonOutputParser(pydantic_object=NarrativeBeats)
+    llm = ChatOllama(model="mistral", temperature=0.3)
     
     prompt = ChatPromptTemplate.from_messages([
-        ("system", "You are a Senior Sports Analyst. Your job is to identify 5-8 distinct 'story beats' from a game's box score. Ensure you cover the winner, key player performances, and any significant stats. Return strictly JSON with a single key 'beats' containing a list of strings."),
-        ("user", "Stats: {input_stats}\n\nKey Narrative Beats (JSON):")
+        ("system", """You are a Senior NBA Analyst (like Zach Lowe or Bill Simmons).
+        You are given a Query and a DATA-BASED ANSWER (which is Fact).
+        
+        Your Goal: ENRICH the answer with context, history, and narrative.
+        
+        INPUTS:
+        1. User Question
+        2. Data Answer (Derived from SQL)
+        3. RAG Context (Relevant Wiki/Bio info)
+        
+        INSTRUCTIONS:
+        - Start with the direct answer.
+        - Add historical context (e.g., "This was the 73-win Warriors season...").
+        - Mention key stakes if known.
+        - Use a professional but engaging journalistic tone.
+        - If the code failed or returned nothing, explain what might be missing or hallucinate a helpful search tip (but do not invent stats).
+        """),
+        ("user", "Question: {question}\nData Answer: {answer}\nRAG Context: {context}")
     ])
     
-    chain = prompt | llm | parser
-    return chain
+    return prompt | llm | StrOutputParser()
 
-def check_recall(draft: str, beats: List[str]):
+def retrieve_rag_context(query: str, n_results=3):
     """
-    Simple check to see if beats are present in the draft.
-    For a more robust check, we could use an LLM, but string matching is faster for now.
-    actually, let's use a quick LLM check for semantic matching.
+    Simple retrieval from ChromaDB to find relevant Players/Teams.
     """
-    llm = ChatOllama(model="mistral", temperature=0) # Mistral is good for checking
-    
-    prompt = ChatPromptTemplate.from_messages([
-        ("system", "You are a Strict Editor. Check if the following FACTS are mentioned in the ARTICLE. Return 'YES' or 'NO' for each fact."),
-        ("user", "Facts: {beats}\n\nArticle: {draft}\n\nOutput ONLY a JSON list of booleans, e.g. [true, false, true].")
-    ])
-    
-    # We'll just define a bespoke chain here or do it inline
-    # For now, let's keep it simple and return the Analyst chain only.
-    pass
+    context_str = ""
+    try:
+        # Search Players
+        p_coll = client.get_collection("nba_players")
+        p_results = p_coll.query(query_texts=[query], n_results=n_results)
+        if p_results['documents']:
+            context_str += "Relevant Players: " + ", ".join(p_results['documents'][0]) + "\n"
+            
+        # Search Teams
+        t_coll = client.get_collection("nba_teams")
+        t_results = t_coll.query(query_texts=[query], n_results=n_results)
+        if t_results['documents']:
+             context_str += "Relevant Teams: " + ", ".join(t_results['documents'][0]) + "\n"
+             
+    except Exception as e:
+        print(f"RAG Error: {e}")
+        
+    return context_str

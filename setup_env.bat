@@ -1,47 +1,48 @@
 @echo off
-echo Setting up SportsEdit-AI Environment...
+setlocal
 
-:: 1. Python Venv Configuration
-set PYTHON_PATH="C:\Users\henry-cao-local\AppData\Local\Programs\Python\Python310\python.exe"
+echo ==================================================
+echo   🏀 Deep Stat AI: Environment Setup
+echo ==================================================
 
-if not exist %PYTHON_PATH% (
-    echo Error: Python 3.10 not found at %PYTHON_PATH%
-    echo Please install Python 3.10 or update the path in setup_env.bat
-    pause
-    exit /b
-)
-
-:: Clean old venv if needed (Simple check: if venv exists, ask user to recreate or just recreate if we want to force 3.10)
-:: For now, we assume if venv exists, we might want to nuking it to be safe, but let's just try to create it if missing.
-if exist "venv" (
-    echo [INFO] Found existing venv. Checking version...
-    venv\Scripts\python --version | findstr "3.10" >nul
-    if errorlevel 1 (
-        echo [WARNING] Existing venv is not Python 3.10. Deleting...
-        rmdir /s /q venv
-    )
-)
-
-if not exist "venv" (
-    echo Creating Python 3.10 venv...
-    %PYTHON_PATH% -m venv venv
-)
-
-echo Activating venv and updating pip...
-call venv\Scripts\activate
-python -m pip install --upgrade pip
-echo Installing dependencies from requirements.txt...
-pip install -r requirements.txt
-
-:: 2. Node Modules
-if exist "client" (
-    echo Installing Node dependencies in client/ ...
-    cd client
-    call npm install
-    cd ..
+:: 1. Find Python 3.10
+set "PYTHON_CMD=python"
+if exist "C:\Users\henry-cao-local\AppData\Local\Programs\Python\Python310\python.exe" (
+    set "PYTHON_CMD=C:\Users\henry-cao-local\AppData\Local\Programs\Python\Python310\python.exe"
+    echo [INFO] Found Python 3.10 at specific path.
 ) else (
-    echo Error: client/ directory not found.
+    echo [INFO] Using system default python.
 )
 
-echo Setup Complete!
+:: 2. Create Virtual Environment
+if not exist "venv" (
+    echo [INFO] Creating venv...
+    "%PYTHON_CMD%" -m venv venv
+) else (
+    echo [INFO] venv already exists.
+)
+
+:: 3. Install Dependencies
+echo [INFO] Installing requirements...
+call venv\Scripts\activate
+pip install duckdb chromadb pandas sentence-transformers langchain langchain-community langchain-core langchain-ollama fastapi uvicorn tabulate
+if %errorlevel% neq 0 (
+    echo [ERROR] Dependency installation failed!
+    pause
+    exit /b %errorlevel%
+)
+
+:: 4. Initialize Database
+if not exist "nba.duckdb" (
+    echo [INFO] Initializing Database (DuckDB + Chroma)...
+    echo      (This may take a minute to load CSVs)
+    python utils/init_db.py
+) else (
+    echo [INFO] Database already exists.
+)
+
+echo.
+echo [SUCCESS] Environment Ready!
+echo Use start_app.bat to launch.
+echo.
 pause

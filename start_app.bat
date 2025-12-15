@@ -1,31 +1,27 @@
 @echo off
-echo Starting SportsEdit-AI System...
+echo ==================================================
+echo   🏀 Deep Stat AI: Launching System
+echo ==================================================
 
-:: Check environment
-if not exist "venv" (
-    echo Venv missing. Run setup_env.bat.
-    pause
-    exit /b
+:: 1. Start Backend (API)
+start "Deep Stat API (Port 8000)" cmd /k "venv\Scripts\activate && python api.py"
+
+:: 2. Start Frontend (React)
+:: Check if node_modules exists, if not run install
+if exist "client\package.json" (
+    cd client
+    if not exist "node_modules" (
+        echo [INFO] Installing Frontend Dependencies...
+        call npm install
+    )
+    start "Deep Stat UI" cmd /k "npm run dev"
+    cd ..
+) else (
+    echo [WARNING] 'client' folder not found. Running API Only.
 )
-if not exist "client\node_modules" (
-    echo Node modules missing. Run setup_env.bat.
-    pause
-    exit /b
-)
 
-:: Activate Python
-call venv\Scripts\activate
-
-:: Start Backend (FastAPI) in a new window
-echo Starting Backend (FastAPI)...
-start "SportsEdit-AI Backend" cmd /k "venv\Scripts\activate && uvicorn api:app --reload --port 8000"
-
-:: Start Frontend (Vite) in a new window
-echo Starting Frontend (React)...
-cd client
-start "SportsEdit-AI Frontend" cmd /k "npm run dev"
-
-echo System Started.
-echo Backend: http://localhost:8000
-echo Frontend: http://localhost:5173
+echo.
+echo [INFO] API running at http://localhost:8000
+echo [INFO] UI running at http://localhost:5173
+echo.
 pause
