@@ -2,7 +2,7 @@
 
 An autonomous "Data Scientist" agent that answers complex natural language queries about NBA history by writing and executing SQL/Python code against local datasets, then synthesizing the results into a sports journalism narrative.
 
-**Goal**: Transform *"Who won the 2016 NBA Championship?"* into a precise answer ("Cleveland Cavaliers") with a rich narrative backstory (3-1 Comeback).
+**Goal**: Transform complex queries like *"Compare LeBron and Curry as GOAT candidates"* into precise statistical tables (PPG, Wins, Efficiency) accompanied by a fact-checked narrative.
 
 ## 🚀 Architecture: "Four-Stage Pipeline"
 
@@ -53,6 +53,12 @@ Double-click `setup_env.bat` (Windows).
 Double-click `start_app.bat`.
 *   Starts Backend at `http://localhost:8000`.
 *   Starts Frontend at `http://localhost:5173`.
+
+## 🔍 Supported Query Types
+*   **Simple Stats**: *"Who had the most points in 2016?"*
+*   **Championships**: *"Who won the 2016 Finals?"* (Handles Season/Year logic).
+*   **Comparisons (Advanced)**: *"Compare LeBron and Curry as GOAT candidates"* (Generates Multi-Player Stats Table).
+*   **Narrative Deep Dives**: *"Tell me about the 2016 Cavaliers comeback."*
 
 ## 🧠 Methodology: "SQL-First"
 
