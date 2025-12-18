@@ -24,13 +24,18 @@ def get_architect_chain():
         INSTRUCTIONS:
         1. Identify Core Tables.
         2. Specify Filters (e.g., SEASON=2016).
+           - **GLOBAL SEARCH**: If no season is specified, do NOT filter by `SEASON`. Instead, `GROUP BY PLAYER_NAME, SEASON` to find the best instances in history.
         3. Specify Merge Logic (e.g., gs.GAME_ID = g.GAME_ID).
-        4. Specify Aggregation (e.g., SUM(PTS)).
-        5. Provide a broad perspective for "best" or "greatest" queries.
+        4. **DERIVED TIME ATTRIBUTES**:
+           - "Rookie" / "Debut" / "First Season" -> Calculate `MIN(SEASON)` per player.
+           - "Retirement" / "Final Season" -> Calculate `MAX(SEASON)` per player.
+           - You MUST instruct the Coder to compute these per player if not provided.
+        5. Specify Aggregation (e.g., SUM(PTS)).
+        6. Provide a broad perspective for "best" or "greatest" queries.
         
-        Example Input: "Who won the 2016 Championship?"
+        Example Input: "Who won the 2008 Championship?"
         Example Output: 
-        1. Load 'games' table (Filter: SEASON=2015 because user means June 2016 Finals, Playoffs).
+        1. Load 'games' table (Filter: SEASON=2007 because user means June 2008 Finals, Playoffs).
         2. Order by GAME_ID DESC and LIMIT 1 to find the last game (The Finals).
         3. Identify the winner using 'HOME_TEAM_WINS'.
         4. Join with 'teams' table to get the Team Name.
@@ -39,7 +44,7 @@ def get_architect_chain():
         Example Output:
         1. Load 'game_stats'.
         2. Group By PLAYER_NAME.
-        3. Calculate Aggregates: SUM(STL) as Total_Steals, SUM(BLK) as Total_Blocks, AVG(STL) as SPG, AVG(BLK) as BPG.
+        3. Calculate Aggregates: SUM(STL) as Total_Steals, SUM(BLK) as Total_Blocks.
         4. Order by (Total_Steals + Total_Blocks) DESC.
         5. Select TOP 10 to provide a broad perspective.
         """),

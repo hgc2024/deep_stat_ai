@@ -1,0 +1,7 @@
+
+--- Testing 'Rookie Logic' (First Season) ---
+    PLAYER_NAME  ...  Rookie_Points
+0  LeBron James  ...         1668.0
+
+[1 rows x 3 columns]
+✅ Verification Success: LeBron Rookie Points = 1668.0 (Season 2003)

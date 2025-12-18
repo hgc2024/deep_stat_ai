@@ -1,35 +1,35 @@
 Testing Question: List some of the greatest rookie seasons in NBA history.
 
 --- ARCHITECT PLAN ---
-1. Load 'game_stats' table.
-2. Filter for players who played their first season (e.g., MIN > 480 or MIN > 750 minutes).
-3. Group by PLAYER_NAME and SEASON.
-4. Calculate Aggregates: SUM(PTS) as Total_Points, AVG(PTS) as Avg_Points, AVG(REB) as Avg_Rebounds, AVG(AST) as Avg_Assists.
-5. Order by Total_Points DESC.
+1. Load 'games' table and 'game_stats' table.
+2. Join 'games' with 'game_stats' on GAME_ID.
+3. Group by PLAYER_NAME, SEASON (to find the best instances in history).
+4. Calculate Aggregates: SUM(PTS) as Total_Points, MIN(SEASON) as First_Season.
+5. Order by Total_Points DESC and First_Season ASC to prioritize players with higher points and earlier debuts.
 6. Select TOP 10 to provide a broad perspective on the greatest rookie seasons in NBA history.
 
 --- CODER CODE ---
 ```python
-import duckdb
-
-con = duckdb.connect('nba.duckdb')
-
-# Q: List some of the greatest rookie seasons in NBA history.
 query = """
+WITH player_milestones AS (
     SELECT gs.PLAYER_NAME, 
-           g.SEASON,
-           SUM(gs.PTS) as Total_Points,
-           AVG(gs.PTS) as Avg_Points,
-           AVG(gs.REB) as Avg_Rebounds,
-           AVG(gs.AST) as Avg_Assists
+           MIN(g.SEASON) as First_Season,
+           MAX(g.SEASON) as Final_Season
     FROM game_stats gs
     JOIN games g ON gs.GAME_ID = g.GAME_ID
-    WHERE gs.MIN > 480 -- Filter for players who played their first season (e.g., MIN > 480 minutes)
-    GROUP BY gs.PLAYER_NAME, g.SEASON
-    ORDER BY Total_Points DESC
-    LIMIT 10
+    GROUP BY gs.PLAYER_NAME
+)
+SELECT gs.PLAYER_NAME, 
+       mil.First_Season as Season,
+       SUM(gs.PTS) as Total_Points
+FROM game_stats gs
+JOIN games g ON gs.GAME_ID = g.GAME_ID
+JOIN player_milestones mil ON gs.PLAYER_NAME = mil.PLAYER_NAME 
+                          AND g.SEASON = mil.First_Season -- Filter for FIRST season
+GROUP BY gs.PLAYER_NAME, mil.First_Season
+ORDER BY Total_Points DESC, First_Season ASC
+LIMIT 10
 """
-
 df = con.execute(query).df()
 print(df)
 ```
