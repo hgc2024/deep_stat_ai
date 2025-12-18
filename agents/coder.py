@@ -12,21 +12,20 @@ def get_coder_chain():
         Your goal is to write a script to answer the question below.
         
         DATABASE: 'nba.duckdb'
-        TABLES (Exact Columns):
-        - games (GAME_ID, GAME_DATE_EST, HOME_TEAM_ID, VISITOR_TEAM_ID, SEASON, HOME_TEAM_WINS, PTS_home, PTS_away)
-          * **PLAYOFFS**: filter where `cast(GAME_ID as VARCHAR) LIKE '4%'`
-          * **REGULAR SEASON**: filter where `cast(GAME_ID as VARCHAR) LIKE '2%'`
-          * `GAME_TYPE` column DOES NOT EXIST. Do not use it.
-        - game_stats (GAME_ID, TEAM_ID, TEAM_CITY, PLAYER_NAME, PTS, REB, AST, MIN)
+        TABLES (ONLY USE THESE):
+        - games (GAME_ID, SEASON, HOME_TEAM_WINS, PTS_home, PTS_away)
+        - game_stats (GAME_ID, TEAM_ID, PLAYER_NAME, PTS, REB, AST, STL, BLK, DREB, PF, MIN, PLUS_MINUS, FG_PCT, FG3_PCT, FT_PCT)
+          * **CRITICAL**: No `SEASON` column here. JOIN with `games` on `GAME_ID`.
         - teams (TEAM_ID, ABBREVIATION, NICKNAME, CITY)
         
-        GUIDELINES:
-        1. **USE SQL FOR LOGIC**: Perform all filtering, joining, and aggregation inside the `con.execute("...")` query.
-           - DuckDB is faster and safer than generating complex Pandas logic.
-        2. **Load Final Result**: Only convert to `.df()` when you have the computed answer.
-        3. **Print**: Use `print(df)` to show the result.
-        4. **Cast Numpy Types**: DuckDB fails on `numpy.int64`. ALWAYS cast to `int()` or `float()` before using in SQL.
-        5. **Use Aliases**: ALWAYS use table aliases (e.g. `game_stats gs`). Select `gs.PTS`, not `PTS`.
+        STRICT RULES:
+        1. **NO HALLUCINATIONS**: DO NOT USE `WIN_SHARES`, `DRAFT_YEAR`, `ROOKIE_STATUS`. They do not exist.
+        2. **STRICT SCHEMA**: If a column is not above, it does not exist.
+        3. **SQL JOIN**: Always join `games` to filter by `SEASON`.
+        4. **EXECUTION**: Use `con.execute(query).df()` and `print(df)`.
+        5. **Print**: Use `print(df)` to show the result.
+        6. **Cast Numpy Types**: DuckDB fails on `numpy.int64`. ALWAYS cast to `int()` or `float()` before using in SQL.
+        7. **Use Aliases**: ALWAYS use table aliases (e.g. `game_stats gs`). Select `gs.PTS`, not `PTS`.
         
         Example Pattern 1 (Championship):
         ```python

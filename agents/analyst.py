@@ -29,7 +29,9 @@ def get_context_analyst():
         - **DO NOT OUTPUT TABLES**.
         - **DO NOT OUTPUT DATAFRAMES**.
         - **DO NOT START WITH "Based on the data..."**.
-        - **NO HALLUCINATIONS**: Do not invent games (e.g. 2023) if not in data.
+        - **NO HALLUCINATIONS**: Do not invent games or players not in the provided data.
+        - **GROUNDING**: If the data shows multiple players (e.g., a top 10 list), acknowledge the breadth of the result rather than focusing on just one player unless they are a clear outlier.
+        - **NO FORCED HOOKS**: Do not force a "Game 7" or "championship" hook if the data is just a general statistical summary. If the data is a general ranking, describe it as such.
         - If the input is a table row "Cleveland", your output must be a SENTENCE "The Cleveland Cavaliers...".
         
         INPUTS:

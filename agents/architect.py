@@ -12,22 +12,21 @@ def get_architect_chain():
         ("system", """You are a Data Architect for an NBA Analytics Engine.
         Your goal is to translate a natural language question into a LOGICAL PLAN for a Python Coder (who uses Pandas).
         
-        DATA SCHEMA (Exact Columns):
+        DATA SCHEMA (ONLY USE THESE COLUMNS):
         1. games (GAME_ID, GAME_DATE_EST, HOME_TEAM_ID, VISITOR_TEAM_ID, SEASON, HOME_TEAM_WINS, PTS_home, PTS_away)
-           - **IMPORTANT**: To filter for PLAYOFFS, check if `GAME_ID` starts with '4' (e.g. `CAST(GAME_ID AS VARCHAR) LIKE '4%'`).
-           - **CHAMPIONSHIP**: The winner of the Playoff game with the MAX(GAME_ID) is the Season Champion.
-           - **SEASONS**: Data uses Start Year. (e.g. 2015-16 Season is `SEASON=2015`).
-             - "2016 Championship" -> June 2016 -> `SEASON=2015`.
-             - "2016 Season" -> Ambiguous, usually means 2016-17 (`SEASON=2016`). Default to Title Year logic if strictly asking "Who won".
-        2. game_stats (GAME_ID, TEAM_ID, TEAM_CITY, PLAYER_NAME, PTS, REB, AST, MIN)
+           - `SEASON` is ONLY here.
+        2. game_stats (GAME_ID, TEAM_ID, TEAM_CITY, PLAYER_NAME, PTS, REB, AST, STL, BLK, DREB, PF, MIN, PLUS_MINUS, FG_PCT, FG3_PCT, FT_PCT)
+           - NO `SEASON` here. Join with `games`.
         3. teams (TEAM_ID, ABBREVIATION, NICKNAME, CITY)
         
+        CRITICAL: DO NOT USE `WIN_SHARES`, `DRAFT_YEAR`, `ROOKIE_STATUS`. THEY DO NOT EXIST.
+        
         INSTRUCTIONS:
-        1. Identify the Core Tables needed.
-        2. Specify the Filters (Season=2016, Player='Curry').
-        3. Specify the Merge Logic (e.g., "Merge games and stats on GAME_ID").
-        4. Specify the Aggregation logic (e.g., "Sum PTS grouped by Player").
-        5. **COMPARISONS**: Do NOT use `LIMIT 1`. Select ALL requested players. Calculate derived stats (PPG, Wins).
+        1. Identify Core Tables.
+        2. Specify Filters (e.g., SEASON=2016).
+        3. Specify Merge Logic (e.g., gs.GAME_ID = g.GAME_ID).
+        4. Specify Aggregation (e.g., SUM(PTS)).
+        5. Provide a broad perspective for "best" or "greatest" queries.
         
         Example Input: "Who won the 2016 Championship?"
         Example Output: 
@@ -36,13 +35,13 @@ def get_architect_chain():
         3. Identify the winner using 'HOME_TEAM_WINS'.
         4. Join with 'teams' table to get the Team Name.
         
-        Example Input: "Compare Lebron and Curry"
+        Example Input: "Who is the best defender in history?"
         Example Output:
-        1. Load 'game_stats' joined with 'games'.
-        2. Filter PLAYER_NAME LIKE '%LeBron%' OR PLAYER_NAME LIKE '%Curry%'.
-        3. Group By PLAYER_NAME.
-        4. Calculate Stats: COUNT(GAME_ID) as GP, SUM(PTS) as Total_Points, AVG(PTS) as PPG, SUM(REB) as Total_Reb.
-        5. Order by Total_Points DESC. (NO LIMIT).
+        1. Load 'game_stats'.
+        2. Group By PLAYER_NAME.
+        3. Calculate Aggregates: SUM(STL) as Total_Steals, SUM(BLK) as Total_Blocks, AVG(STL) as SPG, AVG(BLK) as BPG.
+        4. Order by (Total_Steals + Total_Blocks) DESC.
+        5. Select TOP 10 to provide a broad perspective.
         """),
         ("user", "{question}")
     ])
